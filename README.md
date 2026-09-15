@@ -1,6 +1,78 @@
-# Relay — plan on your main model, code on Sonnet, review on Opus
+# Relay — วางแผนด้วยโมเดลหลัก · เขียนโค้ดด้วย Sonnet · ตรวจด้วย Opus
 
-A Claude Code plugin: one skill (`/relay`) + four subagent seats. **The expensive main model never writes application code.** It plans, writes a brief, dispatches a Sonnet (xhigh) coder, and lets an Opus reviewer check the diff. Small fixes, bug fixes and full features all go through a seat.
+🇹🇭 ภาษาไทยอยู่ด้านบน · 🇬🇧 [English below ↓](#english)
+
+Plugin สำหรับ Claude Code: skill เดียว (`/relay`) + subagent 4 ที่นั่ง (seat)
+**โมเดลแพงที่คุณเปิด session อยู่ (Opus / Fable) จะไม่เขียนโค้ดแอปเองเลย** — มันวางแผน เขียน brief แล้วส่งให้ Sonnet (xhigh) พิมพ์โค้ด และให้ Opus ตรวจ diff แบบ read-only ไม่ว่างานเล็กหรือใหญ่
+
+ทำไมคุ้ม: benchmark ของ Anthropic เอง — Sonnet ทำงานโดยมี Opus ช่วยตัดสินใจ ชนะ Sonnet เดี่ยว **+2.7 pt บน SWE-bench Multilingual และถูกกว่า 11.9% ต่องาน** ส่วนที่กิน token มากที่สุดคือตอนพิมพ์โค้ด จึงเอาโมเดลถูกไปนั่งตรงนั้น ตัวเลขและแหล่งอ้างอิงทั้งหมดอยู่ใน [`skills/relay/research.md`](skills/relay/research.md) (มีสรุปไทย)
+
+## ติดตั้ง
+
+```
+/plugin marketplace add chantanawat/claude-relay
+/plugin install relay@claude-relay
+```
+
+แล้วเปิด Claude Code ใหม่ (ไฟล์ agent โหลดตอนเริ่ม session เท่านั้น)
+
+- แนะนำให้ติดตั้ง plugin `superpowers` (official) ด้วย — relay จะใช้ skill `writing-plans`, `subagent-driven-development`, `systematic-debugging` ของมันเมื่อมี ถ้าไม่มีจะใช้ loop แบบ manual แทน
+- ต้องใช้ Claude Code **v2.1.271 ขึ้นไป** (สำหรับ `omitClaudeMd` — รุ่นเก่ากว่านี้ยังใช้ได้ แค่ seat แพงขึ้น) และ plan ที่มี Opus (Pro / Max / Team / API)
+- plan ที่มีแค่ Sonnet: แก้ `model: opus` → `model: sonnet` ใน `agents/relay-reviewer.md` และ `agents/relay-coder-opus.md`
+
+## วิธีใช้
+
+สั่งงานโค้ดตามปกติ: "เพิ่มปุ่ม export CSV ในหน้า orders", "แก้บั๊ก login redirect" — skill จะทำงานเองเมื่อเจอคำสั่ง build / fix / debug หรือพิมพ์ `/relay` เพื่อบังคับ
+
+relay เลือกรูปแบบให้เอง 3 แบบ:
+
+| แบบ | เมื่อไหร่ | เกิดอะไรขึ้น |
+|---|---|---|
+| **light** | ≤2 ไฟล์ spec ชัด | brief → `relay-coder` → `relay-diffcheck` ตรวจ diff |
+| **debug** | บั๊กในโค้ดเดิม | planner หา root cause → coder แก้ → diffcheck ยืนยันว่าแก้ตรงสาเหตุ + หา bug แบบเดียวกันที่อื่น |
+| **build** | ฟีเจอร์ใหม่ / ≥3 ไฟล์ | plan → วน task (coder → reviewer) → final review โดย Opus · ถามคุณ 1 คำถามก่อนเริ่ม |
+
+seat ทั้ง 4:
+
+| seat | โมเดล | หน้าที่ |
+|---|---|---|
+| `relay-coder` | Sonnet, xhigh | เขียนโค้ด 1 task ต่อครั้ง |
+| `relay-coder-opus` | Opus, high | เขียนโค้ดเมื่องานต้องตัดสินใจ design / ≥5 ไฟล์ / เงิน-auth-concurrency / Sonnet แก้ไม่ผ่าน 2 รอบ |
+| `relay-reviewer` | Opus, read-only | ตรวจ spec + คุณภาพ ให้ verdict Critical / Important / Minor |
+| `relay-diffcheck` | Sonnet, xhigh, read-only | ตรวจ bug fix: ตรง root cause ไหม, regression, มีที่อื่นอีกไหม |
+
+## ทำไมประหยัด
+
+| กลไก | ผล |
+|---|---|
+| `omitClaudeMd: true` + `tools:` allowlist ในทุก seat | seat เริ่มที่ **~8K tokens** แทน 35–70K (ไม่โหลด CLAUDE.md, ไม่โหลด MCP catalog) |
+| brief / report / diff ส่งเป็น**ไฟล์** ไม่ paste ข้อความ | context ของ planner ไม่บวมตลอด session |
+| วน fix ได้ 2 รอบ → Opus 1 รอบ → แล้วไปแก้ plan | ไม่ ping-pong |
+| หลัง final review แก้เป็น wave เดียว | ไม่แยก fixer ต่อ finding |
+
+เพราะ seat ไม่เห็น CLAUDE.md ของคุณ → **กฎของโปรเจกต์ต้องใส่ใน brief** — skill มี template brief พร้อม section `Project rules` ให้แล้ว
+
+## คำถามที่พบบ่อย
+
+**relay บังคับให้ planner เป็นโมเดลไหนไหม?** ไม่ — skill เปลี่ยนโมเดลของ session ไม่ได้ planner = โมเดลที่คุณเลือกด้วย `/model` ตอนเปิด session มีแค่ seat 4 ตัวที่ pin ไว้ (`model: sonnet` / `model: opus` ใน frontmatter — alias จะชี้ไปรุ่นใหม่สุดที่ plan ของคุณมี) ได้ผลดีสุดเมื่อ planner เป็น Opus หรือ Fable ถ้าเปิดด้วย Sonnet ก็ยังบังคับการแบ่งงานและรักษา context หลักให้เล็กอยู่
+
+**ทำไม coder หลักเป็น Sonnet xhigh ไม่ใช่ Opus?** งานตาม pattern เดิม (1–4 ไฟล์ spec ครบ) Sonnet 5 xhigh คะแนนใกล้เคียงและถูกกว่า 2.5× ต่อ token · Opus 5 ชนะชัดในงานยาว/ยาก (SWE-bench Pro ~63% vs ~79%) relay จึง escalate ไป `relay-coder-opus` เมื่อต้องตัดสินใจ design, ≥5 ไฟล์, โค้ดเงิน/auth/concurrency, หรือ Sonnet แก้ไม่ผ่าน 2 รอบ ดู `research.md`
+
+**เปลี่ยนโมเดล/effort ของ seat ได้ไหม?** ได้ — แก้ frontmatter ใน `agents/*.md` แล้วเปิด Claude Code ใหม่ (ไฟล์ agent ที่แก้จะไม่ reload กลาง session)
+
+**ไม่มี superpowers ใช้ได้ไหม?** ได้ — skill อธิบาย loop แบบ manual ไว้แล้ว (brief file → coder → diff file → reviewer)
+
+## License
+
+MIT
+
+---
+
+<a id="english"></a>
+
+# English
+
+Relay is a Claude Code plugin: one skill (`/relay`) + four subagent seats. **The expensive main model never writes application code.** It plans, writes a brief, dispatches a Sonnet (xhigh) coder, and lets an Opus reviewer check the diff. Small fixes, bug fixes and full features all go through a seat.
 
 Why it pays: Anthropic's own advisor benchmarks show Sonnet doing the work with Opus at decision points beats Sonnet alone by **+2.7 pt SWE-bench Multilingual at −11.9% cost per task**. Implementation is where the tokens go, so that is the seat that gets the cheaper model. Full numbers and sources: [`skills/relay/research.md`](skills/relay/research.md).
 
@@ -11,15 +83,32 @@ Why it pays: Anthropic's own advisor benchmarks show Sonnet doing the work with 
 /plugin install relay@claude-relay
 ```
 
-Then restart Claude Code (agent files load at session start). Optional but recommended: the official `superpowers` plugin — relay uses its `writing-plans`, `subagent-driven-development` and `systematic-debugging` skills when present, and falls back to a manual loop when not.
+Then restart Claude Code (agent files load at session start).
 
-Requirements: Claude Code **v2.1.271+** (for `omitClaudeMd`; older versions still work, the seats just cost more), and a plan with Opus access (Pro/Max/Team/API). On a Sonnet-only plan, change `model: opus` to `model: sonnet` in `agents/relay-reviewer.md` and `agents/relay-coder-opus.md`.
+- Recommended: the official `superpowers` plugin — relay uses its `writing-plans`, `subagent-driven-development` and `systematic-debugging` skills when present, and falls back to a manual loop when not.
+- Requires Claude Code **v2.1.271+** (for `omitClaudeMd`; older versions still work, the seats just cost more) and a plan with Opus access (Pro / Max / Team / API).
+- Sonnet-only plan: change `model: opus` to `model: sonnet` in `agents/relay-reviewer.md` and `agents/relay-coder-opus.md`.
 
 ## Use
 
-- Just ask for code: "add a CSV export to the orders page", "fix the login redirect bug". The skill triggers itself on build/fix/debug requests; `/relay` forces it.
-- Three shapes, chosen automatically: **light** (≤2 files → one coder + diff-check), **debug** (planner diagnoses, coder fixes, diff-check verifies), **build** (plan → task loop → final Opus review; asks one question first).
-- Seats: `relay-coder` Sonnet xhigh · `relay-coder-opus` Opus (escalation) · `relay-reviewer` Opus, read-only · `relay-diffcheck` Sonnet xhigh, read-only.
+Just ask for code: "add a CSV export to the orders page", "fix the login redirect bug". The skill triggers itself on build / fix / debug requests; `/relay` forces it.
+
+Three shapes, chosen automatically:
+
+| Shape | When | What happens |
+|---|---|---|
+| **light** | ≤2 files, clear spec | brief → `relay-coder` → `relay-diffcheck` |
+| **debug** | bug in existing code | planner diagnoses the root cause → coder fixes → diffcheck verifies the fix hits the cause and hunts siblings |
+| **build** | new feature / ≥3 files | plan → task loop (coder → reviewer) → final Opus review · asks you one question first |
+
+The four seats:
+
+| Seat | Model | Role |
+|---|---|---|
+| `relay-coder` | Sonnet, xhigh | writes the code, one task per dispatch |
+| `relay-coder-opus` | Opus, high | escalation: design judgment / ≥5 files / money-auth-concurrency / after two failed Sonnet rounds |
+| `relay-reviewer` | Opus, read-only | spec + quality review, Critical / Important / Minor verdicts |
+| `relay-diffcheck` | Sonnet, xhigh, read-only | bug-fix check: root cause, regressions, same bug elsewhere |
 
 ## What makes it cheap
 
@@ -36,21 +125,11 @@ Because the seats never see your CLAUDE.md, **put the project rules in the brief
 
 **Does relay force a specific planner model?** No. A skill cannot change the session model. The planner is whatever `/model` you opened the session with; only the four seats are pinned (`model: sonnet` / `model: opus` in their frontmatter — aliases that resolve to the newest model your plan has). Best results with Opus or Fable as the planner; on Sonnet it still enforces the split and keeps your main context clean.
 
-**Why Sonnet xhigh and not Opus as the default coder?** For pattern-following work (1–4 files, complete spec) Sonnet 5 xhigh is close enough on the benchmarks and 2.5× cheaper per token. Opus 5 wins clearly on long, hard tasks (SWE-bench Pro ~63% vs ~79%), so relay escalates to `relay-coder-opus` for design judgment, ≥5 integrated files, money/auth/concurrency code, and after two failed Sonnet rounds. See `research.md`.
+**Why Sonnet xhigh and not Opus as the default coder?** For pattern-following work (1–4 files, complete spec) Sonnet 5 xhigh is close on the benchmarks and 2.5× cheaper per token. Opus 5 wins clearly on long, hard tasks (SWE-bench Pro ~63% vs ~79%), so relay escalates to `relay-coder-opus` for design judgment, ≥5 integrated files, money/auth/concurrency code, and after two failed Sonnet rounds. See `research.md`.
 
-**Can I change a seat's model or effort?** Yes — edit the frontmatter in `agents/*.md`. Note that edited agent files do not reload mid-session; restart Claude Code.
+**Can I change a seat's model or effort?** Yes — edit the frontmatter in `agents/*.md`, then restart Claude Code (edited agent files do not reload mid-session).
 
 **Does it work without superpowers?** Yes. The skill describes the manual loop (brief file → coder → diff file → reviewer).
-
-## ภาษาไทย
-
-Plugin นี้บังคับให้ **โมเดลแพง (Opus/Fable) ที่คุณเปิด session อยู่ ไม่เขียนโค้ดเอง** — มันวางแผน เขียน brief แล้วส่งให้ Sonnet 5 (xhigh) พิมพ์โค้ด และให้ Opus 5 ตรวจ diff (read-only) ทุกงานไม่ว่าเล็กหรือใหญ่
-
-- ติดตั้ง: `/plugin marketplace add chantanawat/claude-relay` → `/plugin install relay@claude-relay` → เปิด Claude Code ใหม่
-- ใช้: สั่งงานโค้ดตามปกติ ("เพิ่มหน้า…", "แก้บั๊ก…") skill จะทำงานเอง หรือพิมพ์ `/relay`
-- ไม่ได้บังคับ model ของ planner — planner = model ที่คุณเลือกใน `/model` · seat ทั้ง 4 ตัว pin model ไว้ในไฟล์ `agents/*.md`
-- แพ็กเกจ Free (มีแค่ Sonnet): แก้ `model: opus` → `model: sonnet` ใน `relay-reviewer.md` และ `relay-coder-opus.md`
-- ทำไมประหยัด: seat เริ่มที่ ~8K tokens (ไม่โหลด CLAUDE.md/MCP) · ส่งงานเป็นไฟล์ไม่ paste · วน fix ได้แค่ 2 รอบ · เหตุผลและตัวเลข bench อยู่ใน `skills/relay/research.md` (มีสรุปไทย)
 
 ## License
 
