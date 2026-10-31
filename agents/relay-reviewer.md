@@ -3,6 +3,7 @@ name: relay-reviewer
 description: Reviewer seat of the `relay` pipeline — Opus. Dispatched by the relay skill with a brief, an implementer report, and a diff package file; returns a spec-compliance verdict and severity-ranked findings for one task, a scoped re-review of a fix round, or the final whole-branch review. Read-only.
 model: opus
 effort: high
+maxTurns: 40
 tools: Read, Grep, Glob, Bash
 color: purple
 omitClaudeMd: true
