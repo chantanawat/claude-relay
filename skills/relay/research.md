@@ -1,12 +1,14 @@
 # Why relay is shaped this way — research notes (September 2026)
 
-Reference for the seat roster in `SKILL.md`. Numbers are dated; re-verify before quoting them elsewhere.
+Reference for the seat roster in `SKILL.md`. Numbers are dated; re-verify before quoting them elsewhere. §6–7 added October 2026 (v1.1.0).
 
 ## สรุปสั้น (ไทย)
 - Effort คือ "คิดลึกแค่ไหน" ภายในเพดานของโมเดล ไม่ใช่การเปลี่ยนโมเดล · Opus 5 default = `high`
 - Ultracode ไม่ใช่ effort ระดับที่ 6 — คือ `xhigh` + ให้ Claude สั่ง multi-agent workflow เองทุกงาน กิน quota หนัก
 - ตัวแรงวางแผน/ตรวจ ตัวถูกลงมือ = ถูกกว่าและดีกว่า (ตัวเลข official ของ Anthropic เอง)
 - Sonnet 5 xhigh เป็น coder หลักคุ้มจริงสำหรับงานตาม pattern · Opus 5 ชนะชัดในงานยาว/ยาก และอาจถูกกว่าเมื่อ Sonnet ต้องวน fix หลายรอบ
+- เทินกิน quota แม้ context ยังไม่เต็ม (ทุกเทินส่ง context ทั้งก้อนซ้ำ) → planner hand-off ที่ ~90 เทิน/50% บน Max, ~50 เทิน/40% บน Pro · งานซ้ำๆ เยอะๆ = Sonnet เป็น batch ทุก tier ไม่ใช่ Opus ดู §7
+- แผน Pro: Opus นั่งแค่ตำแหน่ง reviewer (อ่านอย่างเดียว) ไม่พิมพ์โค้ด — ที่นั่ง coder คือจุดที่ quota หมด · แผน Max ใช้ roster เดิม · แก้ไม่ผ่าน 3 รอบ → ถามผู้ใช้ก่อนเสมอ (Fable บน Max / Opus บน Pro / แก้ plan) ดู §6
 
 ## 1. Effort levels (official)
 `low · medium · high (default; same as omitting the parameter) · xhigh · max` — all five on Sonnet 5, Opus 5, Fable 5/5.1.
@@ -47,6 +49,22 @@ Implementation is where the tokens go, so the cheap seat sits there; the reviewe
 - One fixer per finding rebuilt context each time; a final-review fix wave cost more than all tasks combined → one fix wave, one scoped re-review.
 - Parallel fan-out measured 2.6–5.9× a sequential pass and not faster (Systima) → never two implementers at once; small tasks stay cheap.
 - Subagent baseline measured in a real workspace: 35–71K tokens for a one-line reply (system prompt + skill listing + CLAUDE.md + full MCP catalog). `omitClaudeMd: true` + a `tools:` allowlist brought a fresh seat to **~8K**. Edited agent files do not reload mid-session; new files do.
+
+## 6. Subscription tiers — why Opus reads but does not type on Pro (October 2026)
+- Claude subscriptions share one 5-hour / weekly usage window across models; Max is sold as **5× or 20× the Pro usage**. Anthropic does not publish the per-model weighting, but Opus costs 2.5× Sonnet per token on the API and the same ratio is the safe assumption for the window.
+- A coder seat is the expensive shape of a dispatch: up to 80 turns of Read/Edit/Bash, every turn re-sending the growing context. A reviewer seat is one read-only pass over a diff file with a hard turn cap (40). The same Opus model costs several times more in the coder seat than in the reviewer seat — and the advisor numbers in §3 say the review is where the strong model pays for itself.
+- Hence §0 of `SKILL.md`: on `pro` Opus holds only the reviewer seat; the automatic escalation after two failed Sonnet rounds is a **fresh Sonnet seat checked by Opus**, and an Opus *coder* round is a question to the user, never a default. On `max` the roster of v1.0 stays (Opus coder on judgment-heavy tasks and as automatic round 3).
+- The question after round 3 (`SKILL.md` §6) exists because every further round costs more than the three before it: the context is bigger, and a third failure usually means the diagnosis or the plan is wrong rather than the typing. The user chooses between the next model up (Fable on max, Opus on pro) and fixing the plan.
+- `relay-coder-top` uses `model: inherit` (documented sub-agent frontmatter value) so it runs on whatever the session runs on — Fable on a Fable session. The `Agent` tool on recent builds also accepts `model: "fable"` as a per-call override; use that instead if your build lists it and your planner is not Fable. The tier itself cannot be detected from inside a session, which is why it is a `CLAUDE.md` line or a one-time question.
+- `relay-coder-lite` (Sonnet, medium, 30 turns) exists for the light shape only: when the brief already contains the exact change, rule 5 ("turn count beats token price") no longer applies — there is nothing to figure out, so the medium effort is enough and the turn cap keeps a confused seat from wandering.
+
+## 7. Turn economics — why a session hands off before the window is full (October 2026)
+- A turn sends the full context (system prompt + every prior message and tool result) and gets a reply. Cost per session ≈ Σ over turns of context size: a 90-turn session that averages 60K context has sent ~5.4M input tokens, whatever the window shows at the end. The workspace measurement that shaped this: 200+-turn sessions were 67.5% of a month's tokens (`token_efficiency_2026.md`).
+- Prompt caching bills cached input at ~10% of the base rate, but a cache entry lives 5 minutes (1 hour with the extended TTL) and every new tool result is uncached once. Caching flattens the curve; it does not remove the turn count from the bill, and subscription windows are drained on the same basis.
+- Quality: long contexts degrade instruction-following and retrieval ("context rot"); the planner's job in relay — ruling on reviewer findings, keeping briefs consistent with the plan — is exactly the kind of work that suffers.
+- Relay sessions grow slower than hand-coding ones: a seat's 80 turns of Read/Edit/Bash stay in the seat; the planner receives a ≤15-line contract. That is why the planner thresholds (max ~90 turns / 50%, pro ~50 turns / 40%) sit close to the workspace's general ~100 / 50% rule instead of far below it, and why pro is lower: the same turns are a bigger share of a smaller window.
+- Hand-off at a task boundary with a handoff file costs one short turn and one file read in the new session; pushing the next task through the old session costs that task's dispatches at the old session's full context each. The file is the ledger the plan already keeps, plus a `Next step` line.
+- Bulk work: Opus is a judgment seat, not a volume seat. N copies of one mechanical edit are Sonnet batches (5–8 files per dispatch keeps each seat under its turn cap and gives one diff-check per batch); the "≥5 files" escalation trigger is only for changes that depend on each other.
 
 ## Sources
 - platform.claude.com/docs/en/build-with-claude/effort · …/prompt-engineering/prompting-claude-sonnet-5

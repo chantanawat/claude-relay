@@ -3,6 +3,7 @@ name: relay-diffcheck
 description: Debug-path reviewer of the `relay` pipeline — Sonnet at xhigh, read-only. Dispatched after the planner has diagnosed a bug and a coder seat applied the fix; receives the symptom, the stated root cause, and a diff file, and verifies that the fix addresses the root cause without regressions and names sibling occurrences of the same bug class.
 model: sonnet
 effort: xhigh
+maxTurns: 40
 tools: Read, Grep, Glob, Bash
 color: cyan
 omitClaudeMd: true

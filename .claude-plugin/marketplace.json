@@ -1,15 +1,22 @@
 {
   "name": "claude-relay",
-  "description": "Relay: plan on your main model, code on Sonnet xhigh, review on Opus.",
-  "owner": { "name": "chantanawat", "url": "https://github.com/chantanawat" },
+  "description": "Relay: plan on your main model, code on Sonnet, review on Opus — tier-aware (max / pro).",
+  "owner": {
+    "name": "chantanawat",
+    "url": "https://github.com/chantanawat"
+  },
   "plugins": [
     {
       "name": "relay",
       "source": "./",
-      "description": "Three-seat coding pipeline: planner never writes app code; Sonnet xhigh implements, Opus reviews.",
-      "version": "1.0.0",
+      "description": "Tier-aware three-seat coding pipeline: planner never writes app code; Sonnet implements, Opus reviews; Opus codes only on max or when the user says yes.",
+      "version": "1.1.0",
       "license": "MIT",
-      "keywords": ["subagents", "multi-model", "token-efficiency"]
+      "keywords": [
+        "subagents",
+        "multi-model",
+        "token-efficiency"
+      ]
     }
   ]
 }

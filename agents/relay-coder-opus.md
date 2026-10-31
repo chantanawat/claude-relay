@@ -1,6 +1,6 @@
 ---
 name: relay-coder-opus
-description: Escalation implementer seat of the `relay` pipeline — Opus. Dispatched by the relay skill instead of relay-coder when a task needs design judgment, touches many integrated files, sits on a money/auth/concurrency path, or when relay-coder failed two fix rounds; same brief/report contract as relay-coder.
+description: Escalation implementer seat of the `relay` pipeline — Opus. On the max tier the relay skill dispatches it instead of relay-coder when a task needs design judgment, touches many integrated files, sits on a money/auth/concurrency path, or when relay-coder failed two fix rounds. On the pro tier it runs only after the user chose it in the escalation question (Opus reviews, Sonnet types). Same brief/report contract as relay-coder.
 model: opus
 effort: high
 maxTurns: 80

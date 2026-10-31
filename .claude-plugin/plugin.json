@@ -1,11 +1,25 @@
 {
   "name": "relay",
   "displayName": "Relay",
-  "description": "Three-seat coding pipeline for Claude Code: your main model plans and briefs, a Sonnet (xhigh) seat writes the code, an Opus seat reviews. The planner never edits application code.",
-  "version": "1.0.0",
-  "author": { "name": "chantanawat", "url": "https://github.com/chantanawat" },
+  "description": "Tier-aware three-seat coding pipeline for Claude Code: your main model plans and briefs, a Sonnet seat writes the code, an Opus seat reviews. On the pro tier Opus never codes unless you say yes; after three failed fix rounds relay asks you before spending Fable or Opus. The planner never edits application code.",
+  "version": "1.1.0",
+  "author": {
+    "name": "chantanawat",
+    "url": "https://github.com/chantanawat"
+  },
   "homepage": "https://github.com/chantanawat/claude-relay",
   "repository": "https://github.com/chantanawat/claude-relay",
   "license": "MIT",
-  "keywords": ["claude-code", "subagents", "multi-model", "sonnet", "opus", "token-efficiency", "code-review"]
+  "keywords": [
+    "claude-code",
+    "subagents",
+    "multi-model",
+    "sonnet",
+    "opus",
+    "token-efficiency",
+    "code-review",
+    "pro",
+    "max",
+    "fable"
+  ]
 }
