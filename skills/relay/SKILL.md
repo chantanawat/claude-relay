@@ -48,6 +48,8 @@ The planner may Edit/Write: plan files, task briefs, ledgers, notes, docs, skill
 | "It's just a version bump / config value" | Configs and version files are app code. Put the bump in the brief. |
 | "The reviewer is Opus; it can fix it while it's there" | The reviewer is read-only by design. Findings go back to a coder seat. |
 | "Sonnet failed twice, Opus will just fix it" | On pro that is the user's quota, not yours. Ask (§6). |
+| "It's 12 files, that's ≥5, so Opus" | Volume is not judgment. Twelve copies of one change are a bulk Sonnet batch; Opus is for changes that depend on each other. |
+| "Context is only 30% full, the session is fine" | Every turn re-sends the whole context. Quota drains with turns × context, not with the fill level. Hand off at the thresholds in §8. |
 
 Red flags — stop: `Edit(` or `Write(` on a source path from this session · "let me quickly" · "while I'm here" · a third fix round nobody asked for.
 
@@ -56,6 +58,7 @@ Red flags — stop: `Edit(` or `Write(` on a source path from this session · "l
 | Signal | Shape |
 |---|---|
 | User asked a question or said "just look / don't change anything" | not relay — answer, no code changes |
+| `/relay resume <handoff-file>` or a fresh session opened with a handoff file | **Resume** — read the handoff file, continue at its `Next step`; re-read nothing else (§8) |
 | ≤2 files, spec already clear (typo, copy, one guard, a config value) | **Light** — one coder dispatch from an inline brief, then `relay-diffcheck` |
 | Bug in existing code | **Debug** — planner diagnoses, coder fixes, diff-check verifies |
 | New feature / screen / module, or ≥3 files | **Build** — plan → task loop → final review. Ask **one** question before the first spawn: `full relay (recommended)` · `light` · `plan only` (add the tier to the same question if it is still unknown) |
@@ -66,7 +69,8 @@ Coder choice, per dispatch:
 |---|---|---|
 | light shape, brief contains the exact change, ≤2 files | `relay-coder-lite` | `relay-coder-lite` |
 | complete spec · follows an existing pattern · 1–4 files | `relay-coder` | `relay-coder` |
-| design judgment left open · ≥5 files with integration concerns · money, auth, tenant, concurrency or data-migration code | `relay-coder-opus` | `relay-coder`, and the check goes to `relay-reviewer` (Opus) instead of `relay-diffcheck` — even in light/debug |
+| **bulk**: many files, the same mechanical change in each (rename, import swap, copy/i18n keys, a config value across services, a pattern applied to N call sites) | `relay-coder`, batches of 5–8 files per dispatch, one `relay-diffcheck` per batch — **never Opus, on any tier** | same |
+| design judgment left open · ≥5 files whose changes **depend on each other** (a shared interface, schema or contract changes) · money, auth, tenant, concurrency or data-migration code | `relay-coder-opus` | `relay-coder`, and the check goes to `relay-reviewer` (Opus) instead of `relay-diffcheck` — even in light/debug |
 | after two failed fix rounds | see §6 — automatic round 3 = `relay-coder-opus` | see §6 — automatic round 3 = fresh `relay-coder` + `relay-reviewer` |
 
 ## 2. The brief — the only thing a seat knows
@@ -136,6 +140,28 @@ Rules for the round after the answer:
 7. **Seats start cold and see no CLAUDE.md** — rules go in the brief; keep briefs small.
 8. **Per-spawn floor ≈ 8K** with these agent files (system prompt + skill listing). Light = 2 spawns ≈ 16K; that is the price of the planner not coding — accept it.
 9. **Opus reads, Sonnet types on pro.** An Opus coder seat is the user's decision, asked once, never assumed.
+10. **Turns drain quota even when the window looks empty.** Σ(context × turns) is the bill; hand off at the §8 thresholds instead of pushing one more task through a 90-turn session.
+11. **Volume goes to Sonnet, on every tier.** Bulk same-shape edits are batches of 5–8 files per dispatch; Opus only when changes depend on each other.
+
+## 8. Session length — hand off, don't grow
+
+Each turn re-sends the whole context, so the price of a session is the **sum of context over turns**, not the size of the context at the end. A relay session grows slower than a hand-coding one (seats carry the code; the planner carries short report contracts), but it still grows every dispatch, and long contexts also make the planner worse at ruling on conflicts. Prompt caching cuts the re-send to a fraction, but the cache expires between turns and never shrinks what you carry.
+
+Hand off when **either** threshold is reached — check at every task boundary (after a check passes, before the next brief), never mid fix-loop:
+
+| Tier | planner turns | context used (`/context` or the status line) |
+|---|---|---|
+| **max** | ~90 | ≥50% |
+| **pro** | ~50 | ≥40% |
+
+Seat turns are separate (`maxTurns` in the agent files caps each seat's own context); these numbers are the **planner's** turns in this session. If your workspace rules set a lower split point, theirs wins.
+
+Hand-off procedure:
+1. Write `<scratch>/relay-handoff-<ts>.md`: tier · shape · plan file path · task ledger (done / open, with report paths) · open findings verbatim · every ruling made · the exact `Next step` (which task, which seat, which brief).
+2. Tell the user in two lines: the handoff path and `open a new session, then /relay resume <path>`. Do not start the next task.
+3. The new session resumes from the file and reads nothing else up front — not the plan's finished tasks, not the old reports.
+
+Build shape: write the plan so the ledger lives in the plan file from the start; then the handoff is the plan file plus a `Next step` line.
 
 ## Lite alternative (no spawning)
 
@@ -143,4 +169,4 @@ Rules for the round after the answer:
 
 ## Why this roster — `research.md`
 
-Effort levels, ultracode, the advisor benchmarks, Sonnet 5 xhigh vs Opus 5 coding scores, the subscription-tier reasoning behind §0 and §6, and the token traps behind rules 1–9. Read it before changing a seat's model or effort.
+Effort levels, ultracode, the advisor benchmarks, Sonnet 5 xhigh vs Opus 5 coding scores, the subscription-tier reasoning behind §0 and §6, the turn economics behind §8, and the token traps behind rules 1–11. Read it before changing a seat's model or effort.

@@ -57,6 +57,19 @@ seat ทั้ง 6:
 
 เหตุผล: ที่นั่ง coder วิ่งได้ถึง 80 turn ส่วนที่นั่ง reviewer อ่าน diff รอบเดียว (cap 40 turn) — โมเดลเดียวกันแต่ค่าใช้จ่ายต่างกันหลายเท่า บน Pro quota หมดที่ตรง coder จึงให้ "Opus อ่าน Sonnet พิมพ์" ดู `research.md` §6
 
+**งานซ้ำๆ เยอะๆ ไม่ซับซ้อน = Sonnet ทุก tier** (rename, สลับ import, ใส่ key i18n, แก้ config ซ้ำหลาย service) — relay แบ่งเป็น batch 5–8 ไฟล์ต่อ dispatch + diffcheck ต่อ batch ไม่ส่ง Opus แม้บน Max เพราะ Opus คือที่นั่งสำหรับ "งานที่ต้องตัดสินใจ" ไม่ใช่ "งานเยอะ"
+
+### Session ยาว: hand-off ไม่ใช่ลากต่อ
+
+ทุกเทินส่ง context ทั้งก้อนซ้ำ ค่าใช้จ่ายของ session = ผลรวม context ต่อเทิน **ไม่ใช่** ขนาด context ตอนจบ — เทินเยอะก็กิน quota แม้หน้าต่างยังไม่เต็ม relay จึงให้ planner หยุดที่ขอบ task (ไม่ใช่กลาง fix loop) เมื่อถึง**อย่างใดอย่างหนึ่ง**:
+
+| tier | เทินของ planner | context ที่ใช้ |
+|---|---|---|
+| Max | ~90 | ≥50% |
+| Pro | ~50 | ≥40% |
+
+แล้วเขียนไฟล์ handoff (tier, shape, plan, ledger งานที่เสร็จ/ค้าง, finding ที่เปิดอยู่, ruling ทุกข้อ, `Next step`) → เปิด session ใหม่ → `/relay resume <path>` session ใหม่อ่านแค่ไฟล์นั้น ไม่อ่าน report เก่า (เทินของ seat แยกต่างหาก ถูก cap ด้วย `maxTurns` ในไฟล์ agent อยู่แล้ว) ดู `research.md` §7
+
 ## ทำไมประหยัด
 
 | กลไก | ผล |
@@ -145,6 +158,19 @@ The six seats:
 | the question when still failing | Fable (`relay-coder-top`) / Opus / revise plan / stop | Opus / revise plan / stop |
 
 Why: a coder seat can run 80 turns of editing; a reviewer seat is one read-only pass over a diff (40-turn cap). Same model, several times the cost. On pro the quota dies in the coder seat, so Opus reads and Sonnet types. See `research.md` §6.
+
+**Bulk, repetitive, simple work is Sonnet on every tier** (renames, import swaps, i18n keys, the same config value across services): relay batches it 5–8 files per dispatch with one diff-check per batch and never sends it to Opus, even on max. Opus is the judgment seat, not the volume seat.
+
+### Long sessions: hand off, don't grow
+
+Every turn re-sends the whole context, so a session costs the **sum of context over turns**, not the size of the window at the end: many turns drain quota even while the window looks half empty. Relay has the planner stop at a task boundary (never mid fix-loop) when **either** threshold is hit:
+
+| tier | planner turns | context used |
+|---|---|---|
+| max | ~90 | ≥50% |
+| pro | ~50 | ≥40% |
+
+It writes a handoff file (tier, shape, plan, done/open ledger, open findings, every ruling, `Next step`) → you open a new session → `/relay resume <path>`. The new session reads only that file, not the old reports. (Seat turns are separate and already capped by `maxTurns` in the agent files.) See `research.md` §7.
 
 ## What makes it cheap
 

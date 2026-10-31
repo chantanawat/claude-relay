@@ -111,7 +111,7 @@ def main() -> int:
     if skill_fm.get("name") != "relay" or not skill_fm.get("description"):
         fail("SKILL.md: frontmatter must have name: relay and a description")
     skill = SKILL.read_text(encoding="utf-8")
-    for needle in ("relay-tier: max", "relay-tier: pro", "AskUserQuestion", "## 6. Fix loop", "## 0. Tier"):
+    for needle in ("relay-tier: max", "relay-tier: pro", "AskUserQuestion", "## 6. Fix loop", "## 0. Tier", "## 8. Session length", "/relay resume"):
         if needle not in skill:
             fail(f"SKILL.md: missing '{needle}'")
 
