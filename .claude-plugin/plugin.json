@@ -1,8 +1,8 @@
 {
   "name": "relay",
   "displayName": "Relay",
-  "description": "Tier-aware three-seat coding pipeline for Claude Code: your main model plans and briefs, a Sonnet seat writes the code, an Opus seat reviews. On the pro tier Opus never codes unless you say yes; after three failed fix rounds relay asks you before spending Fable or Opus. The planner never edits application code.",
-  "version": "1.1.0",
+  "description": "Tier-aware coding pipeline for Claude Code: your strongest model designs once, an Opus foreman plans and briefs, a Sonnet seat writes the code, an Opus seat reviews, and the strongest model comes back read-only at two decision points (a task stuck after three rounds, a finished risk-path build). On the pro tier Opus never codes unless you say yes. The planner never edits application code.",
+  "version": "1.2.0",
   "author": {
     "name": "chantanawat",
     "url": "https://github.com/chantanawat"
@@ -20,6 +20,7 @@
     "code-review",
     "pro",
     "max",
-    "fable"
+    "fable",
+    "checkpoint"
   ]
 }

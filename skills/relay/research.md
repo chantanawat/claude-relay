@@ -1,6 +1,6 @@
 # Why relay is shaped this way — research notes (September 2026)
 
-Reference for the seat roster in `SKILL.md`. Numbers are dated; re-verify before quoting them elsewhere. §6–7 added October 2026 (v1.1.0).
+Reference for the seat roster in `SKILL.md`. Numbers are dated; re-verify before quoting them elsewhere. §6–7 added October 2026 (v1.1.0); §8 added November 2026 (v1.2.0).
 
 ## สรุปสั้น (ไทย)
 - Effort คือ "คิดลึกแค่ไหน" ภายในเพดานของโมเดล ไม่ใช่การเปลี่ยนโมเดล · Opus 5 default = `high`
@@ -8,6 +8,7 @@ Reference for the seat roster in `SKILL.md`. Numbers are dated; re-verify before
 - ตัวแรงวางแผน/ตรวจ ตัวถูกลงมือ = ถูกกว่าและดีกว่า (ตัวเลข official ของ Anthropic เอง)
 - Sonnet 5 xhigh เป็น coder หลักคุ้มจริงสำหรับงานตาม pattern · Opus 5 ชนะชัดในงานยาว/ยาก และอาจถูกกว่าเมื่อ Sonnet ต้องวน fix หลายรอบ
 - เทินกิน quota แม้ context ยังไม่เต็ม (ทุกเทินส่ง context ทั้งก้อนซ้ำ) → planner hand-off ที่ ~90 เทิน/50% บน Max, ~50 เทิน/40% บน Pro · งานซ้ำๆ เยอะๆ = Sonnet เป็น batch ทุก tier ไม่ใช่ Opus ดู §7
+- v1.2.0: โมเดลแรงสุด (Fable) ออกแบบครั้งเดียว แล้วกลับมาอ่านอย่างเดียวที่จุดชี้ขาด 2 จุด (งานติดหลังรอบ 3 · ตรวจปิดงานเสี่ยง) ส่วน Opus คุมลูป — เพราะลูปคือที่ที่ token ไป และการวัดจริงไม่พบว่าให้ตัวแรงคุมแล้วงานผ่านรอบแรกดีกว่า ดู §8
 - แผน Pro: Opus นั่งแค่ตำแหน่ง reviewer (อ่านอย่างเดียว) ไม่พิมพ์โค้ด — ที่นั่ง coder คือจุดที่ quota หมด · แผน Max ใช้ roster เดิม · แก้ไม่ผ่าน 3 รอบ → ถามผู้ใช้ก่อนเสมอ (Fable บน Max / Opus บน Pro / แก้ plan) ดู §6
 
 ## 1. Effort levels (official)
@@ -66,8 +67,33 @@ Implementation is where the tokens go, so the cheap seat sits there; the reviewe
 - Hand-off at a task boundary with a handoff file costs one short turn and one file read in the new session; pushing the next task through the old session costs that task's dispatches at the old session's full context each. The file is the ledger the plan already keeps, plus a `Next step` line.
 - Bulk work: Opus is a judgment seat, not a volume seat. N copies of one mechanical edit are Sonnet batches (5–8 files per dispatch keeps each seat under its turn cap and gives one diff-check per batch); the "≥5 files" escalation trigger is only for changes that depend on each other.
 
+## 8. Design once, check at decision points — why the strongest model does not run the loop (November 2026)
+
+The question behind v1.2.0: when a model above Opus is available (Fable), should it design only, or design and supervise? Neither: it designs once, then returns read-only at decision points.
+
+| Evidence | Number | What it says |
+|---|---|---|
+| List price per MTok (Anthropic pricing page, 2026-11) | Fable 5.2 $8 in / $40 out · Opus 5.5 $4 / $20 · cache read $0.20 on both | the top model is 2× per token; about 1.6× on a long-context turn that is mostly cache reads |
+| One measured headless run with the top model as planner | planner = 57% of a $31.7 run; its context grew 68K → 346K over 157 turns; the coder + QA seats were 8% | the loop is the bill: Σ(context × turns × price), §7 |
+| Vendor benchmarks, Fable 5.2 vs Opus 5.5 at top effort | FrontierCode 2.0 +3.6 pts · FrontierSWE v2 +7.6 pts; Fable `high` ≈ Opus `max` | the quality gap is real but small, and not independently measured yet |
+| One workspace's relay ledger, 361 dispatches over seven weeks | first-round review approval: 48% (25/52) with the top model as planner · 44% (20/45) with Opus as planner | no sign that a stronger foreman lowers rework. Not a controlled A/B — different tasks and skill versions |
+| Same ledger after the review rule changed to "pass if it works", Opus planner | 7/7 first-round approved | the rules moved the number far more than the planner's model did (small n) |
+| Anthropic, *The advisor strategy* (§3) | cheaper main model + stronger model at decision points: −11.9% cost/task, +2.7 pt | the strong model pays at decision points, not throughout |
+| Anthropic, *Harness design for long-running apps* | planner / generator / separate skeptical evaluator | the evaluator is its own seat and judges the end state |
+
+What follows:
+- **The loop goes to Opus.** A foreman turn is mostly clerical (write a brief, dispatch, record a verdict, make a routine ruling) and its context grows with every dispatch — the one place where a 2× price is multiplied by the turn count.
+- **The strongest model is paid for one-pass reads.** A design session is short. A `diagnose` or `acceptance` pass is one cold read of files, about the size of a reviewer dispatch — an estimate from list price, not a measurement: ~150K input + ~5K output ≈ $1.4, against $6.6–9.0 extra for running the whole loop on the top model in the run above.
+- **Why a subagent and not `/advisor`:** the advisor re-reads the whole foreman transcript uncached on every call (§2); the checkpoint seat starts cold at ~8K and reads only the design, the diff and the ledger.
+- **Why `diagnose` comes before the top *coder* seat:** a third failure usually means the plan is wrong (§6). A read-only ruling (≤40 turns) is tried before an 80-turn typing seat, which stays the user's choice.
+- **Why acceptance is judged against `## Design intent`, not the briefs:** every task review grades one task against its own brief. Nobody grades the whole against the design — the seams between tasks and the rulings made mid-run are exactly what a brief-level review cannot see.
+- **Why not switch `/model` after the design:** each model keeps its own prompt cache, so the first turn after a switch re-reads the entire history uncached. A handoff file and a fresh session cost one short turn.
+
+Unproven, on purpose: nothing yet shows that the acceptance pass catches what the Opus final review missed. `SKILL.md` §9 therefore tells you to count the passes that return Blockers and drop the checkpoint if five in a row find nothing. The whole section encodes "the top model is 2× and slightly better" — re-check it at every model release.
+
 ## Sources
 - platform.claude.com/docs/en/build-with-claude/effort · …/prompt-engineering/prompting-claude-sonnet-5
 - code.claude.com/docs/en/workflows · …/advisor · …/model-config · …/sub-agents · …/costs
 - claude.com/blog/the-advisor-strategy · anthropic.com/news/claude-opus-5 · anthropic.com/news/claude-sonnet-5
 - benchlm.ai/compare/claude-opus-5-vs-claude-sonnet-5 (third-party aggregate) · systima.ai/blog/subagent-tax
+- §8: platform.claude.com/docs/en/about-claude/pricing · anthropic.com/claude-fable-and-mythos-5-2 (vendor benchmarks) · code.claude.com/docs/en/prompt-caching · anthropic.com/engineering/harness-design-long-running-apps

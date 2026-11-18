@@ -16,6 +16,7 @@ RESEARCH = ROOT / "skills" / "relay" / "research.md"
 README = ROOT / "README.md"
 PLUGIN = ROOT / ".claude-plugin" / "plugin.json"
 MARKET = ROOT / ".claude-plugin" / "marketplace.json"
+CHANGELOG = ROOT / "CHANGELOG.md"
 
 MODELS = {"sonnet", "opus", "haiku", "inherit"}
 EFFORTS = {"low", "medium", "high", "xhigh", "max"}
@@ -92,7 +93,8 @@ def check_agent(path: Path) -> str | None:
 
 def main() -> int:
     seats = {check_agent(p) for p in sorted(AGENTS.glob("*.md"))} - {None}
-    expected = {"relay-coder-lite", "relay-coder", "relay-coder-opus", "relay-coder-top", "relay-reviewer", "relay-diffcheck"}
+    expected = {"relay-coder-lite", "relay-coder", "relay-coder-opus", "relay-coder-top", "relay-reviewer", "relay-diffcheck",
+                "relay-checkpoint"}
     if seats != expected:
         fail(f"agents/: seats {sorted(seats)} != expected {sorted(expected)}")
 
@@ -111,7 +113,8 @@ def main() -> int:
     if skill_fm.get("name") != "relay" or not skill_fm.get("description"):
         fail("SKILL.md: frontmatter must have name: relay and a description")
     skill = SKILL.read_text(encoding="utf-8")
-    for needle in ("relay-tier: max", "relay-tier: pro", "AskUserQuestion", "## 6. Fix loop", "## 0. Tier", "## 8. Session length", "/relay resume"):
+    for needle in ("relay-tier: max", "relay-tier: pro", "AskUserQuestion", "## 6. Fix loop", "## 0. Tier", "## 8. Session length", "/relay resume",
+                   "## 9. Design once", "## Design intent", "mode: <acceptance | diagnose>"):
         if needle not in skill:
             fail(f"SKILL.md: missing '{needle}'")
 
@@ -124,6 +127,8 @@ def main() -> int:
         fail(f"plugin.json: version '{pv}' is not semver")
     if plugin.get("name") != "relay" or market["plugins"][0].get("name") != "relay":
         fail("manifests: plugin name must be 'relay'")
+    if f"## {pv} " not in CHANGELOG.read_text(encoding="utf-8"):
+        fail(f"CHANGELOG.md: no '## {pv} ' entry for the manifest version")
 
     if failures:
         print("\n".join(f"FAIL {f}" for f in failures), file=sys.stderr)
